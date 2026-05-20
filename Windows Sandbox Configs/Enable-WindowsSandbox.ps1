@@ -105,23 +105,27 @@ if ($osFreeMB -lt $suggestedMB) {
     Pass "Free RAM: ${osFreeMB}MB (≥ ${suggestedMB}MB recommended)."
 }
 
-# 6. Hyper-V / Virtual Machine Platform feature state
+# 6. Hyper-V / Virtual Machine Platform feature state (requires admin)
 $features = @(
     @{ Name = "Microsoft-Hyper-V";            Label = "Hyper-V Platform" },
     @{ Name = "VirtualMachinePlatform";        Label = "Virtual Machine Platform" },
     @{ Name = "Containers-DisposableClientVM"; Label = "Windows Sandbox" }
 )
 $anyMissing = $false
-foreach ($f in $features) {
-    $state = Get-WindowsOptionalFeature -Online -FeatureName $f.Name -ErrorAction SilentlyContinue
-    if ($state -and $state.State -eq "Enabled") {
-        Pass "$($f.Label) [$($f.Name)] is enabled."
-    } elseif ($state -and $state.State -eq "EnablePending") {
-        Warn "$($f.Label) [$($f.Name)] — enabled pending reboot."
-    } else {
-        Warn "$($f.Label) [$($f.Name)] is NOT enabled."
-        $anyMissing = $true
+if (Test-LocalAdmin) {
+    foreach ($f in $features) {
+        $state = Get-WindowsOptionalFeature -Online -FeatureName $f.Name -ErrorAction SilentlyContinue
+        if ($state -and $state.State -eq "Enabled") {
+            Pass "$($f.Label) [$($f.Name)] is enabled."
+        } elseif ($state -and $state.State -eq "EnablePending") {
+            Warn "$($f.Label) [$($f.Name)] — enabled pending reboot."
+        } else {
+            Warn "$($f.Label) [$($f.Name)] is NOT enabled."
+            $anyMissing = $true
+        }
     }
+} else {
+    Warn "Cannot check feature states — run as Admin to evaluate."
 }
 
 # 7. Group Policy check

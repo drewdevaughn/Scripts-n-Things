@@ -1,4 +1,4 @@
-﻿<Configuration>
+<Configuration>
   <VGpu>Default</VGpu>
   <RAM>4096</RAM>
   <Networking>Enable</Networking>
@@ -16,7 +16,7 @@
           Invoke-WebRequest -Uri 'https://zoom.us/client/latest/ZoomInstaller.exe' -OutFile $zc -UseBasicParsing -ErrorAction Stop;
           Start-Process -FilePath $zc -ArgumentList '/silent' -Wait -NoNewWindow;
           Write-Host '[Sandbox] Zoom installed.' -ForegroundColor Green;
-        } catch { Write-Host ("[Sandbox] Zoom install failed: " + $_.Exception.Message) -ForegroundColor Red }
+        } catch { Write-Host (""[Sandbox] Zoom install failed: "" + $_.Exception.Message) -ForegroundColor Red }
 
         Write-Host '[Sandbox] Installing Telegram...' -ForegroundColor Cyan;
         $tc = 'C:\Users\WDAGUtilityAccount\Desktop\TelegramSetup.exe';
@@ -24,7 +24,7 @@
           Invoke-WebRequest -Uri 'https://telegram.org/dl/desktop/win64' -OutFile $tc -UseBasicParsing -ErrorAction Stop;
           Start-Process -FilePath $tc -ArgumentList '/S' -Wait -NoNewWindow;
           Write-Host '[Sandbox] Telegram installed.' -ForegroundColor Green;
-        } catch { Write-Host ("[Sandbox] Telegram install failed: " + $_.Exception.Message) -ForegroundColor Red }
+        } catch { Write-Host (""[Sandbox] Telegram install failed: "" + $_.Exception.Message) -ForegroundColor Red }
 
         Remove-Item $zc -Force -ErrorAction SilentlyContinue;
         Remove-Item $tc -Force -ErrorAction SilentlyContinue;

@@ -47,15 +47,19 @@ if ($freeMB -lt $needed) {
     Warn "Host free RAM: ${freeMB}MB. Sandbox wants ${MemoryMB}MB + ${headroom}MB overhead = ${needed}MB. May be tight."
 }
 
-# 3. Check sandbox feature state
-$sbFeature = Get-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -ErrorAction SilentlyContinue
-if (-not $sbFeature -or $sbFeature.State -eq "Disabled") {
-    Warn "Windows Sandbox feature is not enabled. Run Enable-WindowsSandbox.ps1 first (requires reboot)."
-    $allOk = $false
-} elseif ($sbFeature.State -eq "EnablePending") {
-    Warn "Windows Sandbox enable is pending a reboot."
-} else {
-    Pass "Windows Sandbox feature is enabled."
+# 3. Check sandbox feature state (requires admin)
+try {
+    $sbFeature = Get-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -ErrorAction Stop
+    if ($sbFeature.State -eq "Disabled") {
+        Warn "Windows Sandbox feature is not enabled. Run Enable-WindowsSandbox.ps1 first (requires reboot)."
+        $allOk = $false
+    } elseif ($sbFeature.State -eq "EnablePending") {
+        Warn "Windows Sandbox enable is pending a reboot."
+    } else {
+        Pass "Windows Sandbox feature is enabled."
+    }
+} catch {
+    Warn "Could not check Sandbox feature state (run as Admin to check). Skipping."
 }
 
 # 4. Check virtualization
@@ -76,10 +80,10 @@ if ($Diagnose) {
 }
 
 # ---------- build config ----------
-$wsbContent = @"
+$template = @'
 <Configuration>
   <VGpu>Default</VGpu>
-  <RAM>$MemoryMB</RAM>
+  <RAM>__RAMMB__</RAM>
   <Networking>Enable</Networking>
   <AudioInput>Enable</AudioInput>
   <VideoInput>Enable</VideoInput>
@@ -90,29 +94,30 @@ $wsbContent = @"
     <Command>
       powershell.exe -NoLogo -WindowStyle Hidden -ExecutionPolicy Bypass -Command "
         Write-Host '[Sandbox] Installing Zoom...' -ForegroundColor Cyan;
-        `$zc = 'C:\Users\WDAGUtilityAccount\Desktop\ZoomInstaller.exe';
+        $zc = 'C:\Users\WDAGUtilityAccount\Desktop\ZoomInstaller.exe';
         try {
-          Invoke-WebRequest -Uri 'https://zoom.us/client/latest/ZoomInstaller.exe' -OutFile `$zc -UseBasicParsing -ErrorAction Stop;
-          Start-Process -FilePath `$zc -ArgumentList '/silent' -Wait -NoNewWindow;
+          Invoke-WebRequest -Uri 'https://zoom.us/client/latest/ZoomInstaller.exe' -OutFile $zc -UseBasicParsing -ErrorAction Stop;
+          Start-Process -FilePath $zc -ArgumentList '/silent' -Wait -NoNewWindow;
           Write-Host '[Sandbox] Zoom installed.' -ForegroundColor Green;
-        } catch { Write-Host (\"[Sandbox] Zoom install failed: \" + `$_.Exception.Message) -ForegroundColor Red }
+        } catch { Write-Host (""[Sandbox] Zoom install failed: "" + $_.Exception.Message) -ForegroundColor Red }
 
         Write-Host '[Sandbox] Installing Telegram...' -ForegroundColor Cyan;
-        `$tc = 'C:\Users\WDAGUtilityAccount\Desktop\TelegramSetup.exe';
+        $tc = 'C:\Users\WDAGUtilityAccount\Desktop\TelegramSetup.exe';
         try {
-          Invoke-WebRequest -Uri 'https://telegram.org/dl/desktop/win64' -OutFile `$tc -UseBasicParsing -ErrorAction Stop;
-          Start-Process -FilePath `$tc -ArgumentList '/S' -Wait -NoNewWindow;
+          Invoke-WebRequest -Uri 'https://telegram.org/dl/desktop/win64' -OutFile $tc -UseBasicParsing -ErrorAction Stop;
+          Start-Process -FilePath $tc -ArgumentList '/S' -Wait -NoNewWindow;
           Write-Host '[Sandbox] Telegram installed.' -ForegroundColor Green;
-        } catch { Write-Host (\"[Sandbox] Telegram install failed: \" + `$_.Exception.Message) -ForegroundColor Red }
+        } catch { Write-Host (""[Sandbox] Telegram install failed: "" + $_.Exception.Message) -ForegroundColor Red }
 
-        Remove-Item `$zc -Force -ErrorAction SilentlyContinue;
-        Remove-Item `$tc -Force -ErrorAction SilentlyContinue;
+        Remove-Item $zc -Force -ErrorAction SilentlyContinue;
+        Remove-Item $tc -Force -ErrorAction SilentlyContinue;
         Write-Host '[Sandbox] Setup complete.' -ForegroundColor Green;
       "
     </Command>
   </LogonCommand>
 </Configuration>
-"@
+'@
+$wsbContent = $template -replace '__RAMMB__', $MemoryMB
 
 # ---------- write ----------
 if ((Test-Path $OutputPath) -and -not $Force) {
